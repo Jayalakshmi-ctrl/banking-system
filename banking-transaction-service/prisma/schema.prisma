@@ -1,0 +1,42 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Transaction {
+  txn_id       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  account_id   String   @db.Uuid
+  amount       Decimal  @db.Decimal(15, 2)
+  txn_type     String   @db.VarChar(15)
+  counterparty String?  @db.VarChar(100)
+  reference    String   @unique @db.VarChar(50)
+  created_at   DateTime @default(now()) @db.Timestamptz(6)
+
+  @@index([account_id], map: "idx_txn_account")
+  @@index([created_at], map: "idx_txn_created")
+  @@map("transactions")
+}
+
+model IdempotencyKey {
+  idempotency_key String   @id @db.VarChar(64)
+  txn_id          String   @db.Uuid
+  response_body   Json?
+  created_at      DateTime @default(now()) @db.Timestamptz(6)
+  expires_at      DateTime @db.Timestamptz(6)
+
+  @@index([expires_at], map: "idx_idempotency_expires")
+  @@map("idempotency_keys")
+}
+
+model AccountReadModel {
+  account_id   String   @id @db.Uuid
+  status       String?  @db.VarChar(10)
+  account_type String?  @db.VarChar(10)
+  synced_at    DateTime @default(now()) @db.Timestamptz(6)
+
+  @@map("account_read_model")
+}

@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: transaction-service-config
+  namespace: banking-system
+  labels:
+    app: transaction-service
+data:
+  ACCOUNT_SERVICE_URL: "http://account-service:8002"
+  PORT: "8003"
+  LOG_LEVEL: "info"
+  DAILY_TRANSFER_LIMIT: "200000"
+  HIGH_VALUE_THRESHOLD: "50000"
