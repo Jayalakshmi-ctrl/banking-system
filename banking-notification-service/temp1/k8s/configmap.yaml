@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: customer-service-config
+  namespace: banking-system
+  labels:
+    app: customer-service
+data:
+  SERVICE_NAME: customer-service
+  LOG_LEVEL: INFO
