@@ -1,0 +1,229 @@
+services:
+  # ---------- Databases ----------
+  customer-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: customer_db
+      POSTGRES_USER: customer_user
+      POSTGRES_PASSWORD: customer_pass
+    ports:
+      - "5433:5432"
+    volumes:
+      - customer-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U customer_user -d customer_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  account-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: account_db
+      POSTGRES_USER: account_user
+      POSTGRES_PASSWORD: account_pass
+    ports:
+      - "5434:5432"
+    volumes:
+      - account-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U account_user -d account_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  transaction-db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: transaction_db
+      POSTGRES_USER: txn_user
+      POSTGRES_PASSWORD: txn_pass
+    ports:
+      - "5435:5432"
+    volumes:
+      - transaction-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U txn_user -d transaction_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  notification-db:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: notif_user
+      MONGO_INITDB_ROOT_PASSWORD: notif_pass
+      MONGO_INITDB_DATABASE: notification_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - notification-db-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------- Message Broker ----------
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------- Microservices ----------
+  customer-service:
+    build:
+      context: ./banking-customer-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      DATABASE_URL: "postgresql+asyncpg://customer_user:customer_pass@customer-db:5432/customer_db"
+      SERVICE_NAME: customer-service
+      LOG_LEVEL: INFO
+    depends_on:
+      customer-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')\""]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+
+  account-service:
+    build:
+      context: ./banking-account-service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      DATABASE_URL: "jdbc:postgresql://account-db:5432/account_db"
+      DATABASE_USERNAME: account_user
+      DATABASE_PASSWORD: account_pass
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: guest
+      RABBITMQ_PASSWORD: guest
+      CUSTOMER_SERVICE_URL: "http://customer-service:8001"
+      SPRING_PROFILES_ACTIVE: docker
+    depends_on:
+      account-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      customer-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8002/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+
+  transaction-service:
+    build:
+      context: ./banking-transaction-service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      DATABASE_URL: "postgresql://txn_user:txn_pass@transaction-db:5432/transaction_db"
+      ACCOUNT_SERVICE_URL: "http://account-service:8002"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+      PORT: "8003"
+      LOG_LEVEL: info
+      DAILY_TRANSFER_LIMIT: "200000"
+      HIGH_VALUE_THRESHOLD: "50000"
+    depends_on:
+      transaction-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      account-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8003/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  notification-service:
+    build:
+      context: ./banking-notification-service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      MONGODB_URL: "mongodb://notif_user:notif_pass@notification-db:27017/notification_db?authSource=admin"
+      RABBITMQ_URL: "amqp://guest:guest@rabbitmq:5672"
+      HIGH_VALUE_THRESHOLD: "50000"
+      MAX_RETRY_COUNT: "3"
+      PORT: "8004"
+      LOG_LEVEL: INFO
+      ENABLE_RABBIT_CONSUMER: "true"
+      ENABLE_HSTS: "false"
+    depends_on:
+      notification-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8004/health', timeout=4)\""]
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  # ---------- Monitoring ----------
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./banking-infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.retention.time=7d"
+    depends_on:
+      - customer-service
+      - account-service
+      - transaction-service
+      - notification-service
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./banking-infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./banking-infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+
+volumes:
+  customer-db-data:
+  account-db-data:
+  transaction-db-data:
+  notification-db-data:
+  rabbitmq-data:
+  prometheus-data:
+  grafana-data:
