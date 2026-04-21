@@ -63,7 +63,11 @@ public class GlobalExceptionHandler {
         if (status == null) {
             status = HttpStatus.UNPROCESSABLE_ENTITY;
         }
-        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, "Request could not be processed");
+        String detail = ex.getMessage();
+        if (detail == null || detail.isBlank()) {
+            detail = "Request could not be processed";
+        }
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(status, detail);
         problem.setTitle(status.getReasonPhrase());
         problem.setType(TYPE_CONFLICT);
         problem.setInstance(URI.create(request.getRequestURI()));
