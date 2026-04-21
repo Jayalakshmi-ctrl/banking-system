@@ -1,0 +1,447 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Transaction Service API",
+    "version": "1.0.0",
+    "description": "Banking transaction microservice. **All monetary amounts are JSON strings** (e.g. `\"100.50\"`) with up to 2 decimal places, greater than zero. Request bodies use **snake_case** keys (`account_id`, `from_account_id`). **Transfers** require the **`Idempotency-Key`** header (1–64 chars: letters, digits, `_`, `-`). Statement and list query dates use **ISO-8601** with offset (e.g. `2024-01-01T00:00:00.000Z`). Use **Try it out** — request bodies are pre-filled from the `example` on each operation."
+  },
+  "servers": [{ "url": "/", "description": "This service (e.g. http://localhost:8003)" }],
+  "tags": [
+    { "name": "Health", "description": "Liveness" },
+    { "name": "Observability", "description": "Metrics" },
+    { "name": "Transactions", "description": "Deposits, withdrawals, transfers, listing" },
+    { "name": "Statements", "description": "Account transaction history" }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "string", "example": "healthy" },
+                    "service": { "type": "string", "example": "transaction-service" },
+                    "version": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/metrics": {
+      "get": {
+        "tags": ["Observability"],
+        "summary": "Prometheus metrics",
+        "responses": {
+          "200": {
+            "description": "Prometheus text exposition",
+            "content": { "text/plain": { "schema": { "type": "string" } } }
+          }
+        }
+      }
+    },
+    "/api/v1/transactions/deposit": {
+      "post": {
+        "tags": ["Transactions"],
+        "summary": "Process deposit",
+        "requestBody": {
+          "required": true,
+          "description": "JSON body. `counterparty` is optional (1–100 chars: letters, digits, `:`, `_`, `-`, `.`, spaces).",
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DepositRequest" },
+              "example": {
+                "account_id": "550e8400-e29b-41d4-a716-446655440000",
+                "amount": "500.00",
+                "counterparty": "CASH_DEPOSIT"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TransactionResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem400" },
+          "502": { "$ref": "#/components/responses/Problem502" }
+        }
+      }
+    },
+    "/api/v1/transactions/withdrawal": {
+      "post": {
+        "tags": ["Transactions"],
+        "summary": "Process withdrawal",
+        "requestBody": {
+          "required": true,
+          "description": "JSON body. `counterparty` is optional.",
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/WithdrawalRequest" },
+              "example": {
+                "account_id": "550e8400-e29b-41d4-a716-446655440000",
+                "amount": "50.00",
+                "counterparty": "ATM_WITHDRAWAL"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TransactionResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem400" },
+          "502": { "$ref": "#/components/responses/Problem502" }
+        }
+      }
+    },
+    "/api/v1/transactions/transfer": {
+      "post": {
+        "tags": ["Transactions"],
+        "summary": "Process transfer (requires Idempotency-Key header)",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "description": "Unique key per logical transfer; replays return the same result.",
+            "schema": { "type": "string", "minLength": 1, "maxLength": 64, "pattern": "^[A-Za-z0-9_-]+$" },
+            "example": "transfer-2026-04-16-001"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "JSON body. `counterparty` is optional.",
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/TransferRequest" },
+              "example": {
+                "from_account_id": "550e8400-e29b-41d4-a716-446655440000",
+                "to_account_id": "660e8400-e29b-41d4-a716-446655440001",
+                "amount": "10.00",
+                "counterparty": "P2P_TRANSFER"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TransferResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem400" },
+          "502": { "$ref": "#/components/responses/Problem502" }
+        }
+      }
+    },
+    "/api/v1/transactions": {
+      "get": {
+        "tags": ["Transactions"],
+        "summary": "List transactions (paginated)",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Page size (1–100)",
+            "schema": { "type": "integer", "minimum": 1, "maximum": 100, "default": 20 },
+            "example": 20,
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "description": "Zero-based offset",
+            "schema": { "type": "integer", "minimum": 0, "maximum": 1000000, "default": 0 },
+            "example": 0,
+            "style": "form",
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PagedTransactions" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem400" }
+        }
+      }
+    },
+    "/api/v1/transactions/{id}": {
+      "get": {
+        "tags": ["Transactions"],
+        "summary": "Get transaction by ID",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Transaction UUID",
+            "schema": { "type": "string", "format": "uuid" },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/TransactionResponse" }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem400" },
+          "404": { "$ref": "#/components/responses/Problem404" }
+        }
+      }
+    },
+    "/api/v1/accounts/{accountId}/statements": {
+      "get": {
+        "tags": ["Statements"],
+        "summary": "Account statement for date range",
+        "parameters": [
+          {
+            "name": "accountId",
+            "in": "path",
+            "required": true,
+            "description": "Account UUID",
+            "schema": { "type": "string", "format": "uuid" },
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          {
+            "name": "from_date",
+            "in": "query",
+            "required": true,
+            "description": "ISO-8601 datetime with offset (must be <= to_date)",
+            "schema": { "type": "string", "format": "date-time" },
+            "example": "2024-01-01T00:00:00.000Z",
+            "style": "form",
+            "explode": true
+          },
+          {
+            "name": "to_date",
+            "in": "query",
+            "required": true,
+            "description": "ISO-8601 datetime with offset",
+            "schema": { "type": "string", "format": "date-time" },
+            "example": "2024-12-31T23:59:59.000Z",
+            "style": "form",
+            "explode": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": { "$ref": "#/components/schemas/TransactionResponse" }
+                    }
+                  },
+                  "required": ["data"]
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/Problem400" },
+          "502": { "$ref": "#/components/responses/Problem502" }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "DepositRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["account_id", "amount"],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Target account UUID",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "amount": {
+            "type": "string",
+            "description": "Positive decimal string, max 2 fractional digits",
+            "pattern": "^\\d+(\\.\\d{1,2})?$",
+            "example": "500.00"
+          },
+          "counterparty": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9:_\\-.\\s]+$",
+            "description": "Optional label (e.g. branch or channel)",
+            "example": "CASH_DEPOSIT"
+          }
+        }
+      },
+      "WithdrawalRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["account_id", "amount"],
+        "properties": {
+          "account_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d{1,2})?$",
+            "example": "50.00"
+          },
+          "counterparty": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9:_\\-.\\s]+$",
+            "example": "ATM_WITHDRAWAL"
+          }
+        }
+      },
+      "TransferRequest": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from_account_id", "to_account_id", "amount"],
+        "properties": {
+          "from_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "to_account_id": {
+            "type": "string",
+            "format": "uuid",
+            "example": "660e8400-e29b-41d4-a716-446655440001"
+          },
+          "amount": {
+            "type": "string",
+            "pattern": "^\\d+(\\.\\d{1,2})?$",
+            "example": "10.00"
+          },
+          "counterparty": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100,
+            "pattern": "^[A-Za-z0-9:_\\-.\\s]+$",
+            "example": "P2P_TRANSFER"
+          }
+        }
+      },
+      "TransactionResponse": {
+        "type": "object",
+        "required": [
+          "txn_id",
+          "account_id",
+          "amount",
+          "txn_type",
+          "counterparty",
+          "reference",
+          "created_at"
+        ],
+        "properties": {
+          "txn_id": { "type": "string", "format": "uuid" },
+          "account_id": { "type": "string", "format": "uuid" },
+          "amount": { "type": "string" },
+          "txn_type": {
+            "type": "string",
+            "enum": ["DEPOSIT", "WITHDRAWAL", "TRANSFER_IN", "TRANSFER_OUT", "PAYMENT"]
+          },
+          "counterparty": { "type": "string", "nullable": true },
+          "reference": { "type": "string" },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      },
+      "TransferResponse": {
+        "type": "object",
+        "required": ["transfer_out", "transfer_in"],
+        "properties": {
+          "transfer_out": { "$ref": "#/components/schemas/TransactionResponse" },
+          "transfer_in": { "$ref": "#/components/schemas/TransactionResponse" }
+        }
+      },
+      "PagedTransactions": {
+        "type": "object",
+        "required": ["data", "total", "limit", "offset"],
+        "properties": {
+          "data": {
+            "type": "array",
+            "items": { "$ref": "#/components/schemas/TransactionResponse" }
+          },
+          "total": { "type": "integer" },
+          "limit": { "type": "integer" },
+          "offset": { "type": "integer" }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "title": { "type": "string" },
+          "detail": { "type": "string" },
+          "instance": { "type": "string" }
+        }
+      }
+    },
+    "responses": {
+      "Problem400": {
+        "description": "Validation error",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Problem" }
+          }
+        }
+      },
+      "Problem404": {
+        "description": "Not found",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Problem" }
+          }
+        }
+      },
+      "Problem502": {
+        "description": "Downstream / account service failure",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/Problem" }
+          }
+        }
+      }
+    }
+  }
+}

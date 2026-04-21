@@ -17,60 +17,7 @@ function asyncHandler(
   };
 }
 
-/**
- * @openapi
- * /api/v1/transactions/deposit:
- *   post:
- *     summary: Process deposit
- *     tags: [Transactions]
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required: [account_id, amount]
- *             properties:
- *               account_id: { type: string, format: uuid }
- *               amount: { type: string }
- *               counterparty: { type: string }
- *     responses:
- *       201:
- *         description: Created
- */
-/**
- * @openapi
- * /api/v1/transactions/withdrawal:
- *   post:
- *     summary: Process withdrawal
- *     tags: [Transactions]
- */
-/**
- * @openapi
- * /api/v1/transactions/transfer:
- *   post:
- *     summary: Process transfer
- *     tags: [Transactions]
- *     parameters:
- *       - in: header
- *         name: Idempotency-Key
- *         required: true
- *         schema: { type: string }
- */
-/**
- * @openapi
- * /api/v1/transactions:
- *   get:
- *     summary: List transactions
- *     tags: [Transactions]
- */
-/**
- * @openapi
- * /api/v1/transactions/{id}:
- *   get:
- *     summary: Get transaction by ID
- *     tags: [Transactions]
- */
+/** HTTP handlers; OpenAPI for Swagger UI is served from `openapi/openapi.json`. */
 
 export function createTransactionRouter(service: TransactionService): Router {
   const router = Router();

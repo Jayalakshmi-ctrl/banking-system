@@ -1,9 +1,9 @@
+import fs from "fs";
 import path from "path";
 import express from "express";
 import type { Logger } from "pino";
 import pinoHttp from "pino-http";
 import promClient from "prom-client";
-import swaggerJsdoc from "swagger-jsdoc";
 import swaggerUi from "swagger-ui-express";
 import type { TransactionService } from "./application/services/transaction.service";
 import { correlationMiddleware } from "./presentation/middleware/correlation.middleware";
@@ -22,10 +22,33 @@ export interface CreateAppInput {
   serviceVersion: string;
 }
 
-function securityHeadersMiddleware(_req: express.Request, res: express.Response, next: express.NextFunction): void {
-  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-  res.setHeader("Content-Security-Policy", "default-src 'self'");
+function isOpenApiDocumentationPath(urlPath: string): boolean {
+  return (
+    urlPath === "/openapi.json" ||
+    urlPath === "/api/docs" ||
+    urlPath.startsWith("/api/docs/")
+  );
+}
+
+function loadOpenApiDocument(serviceVersion: string): Record<string, unknown> {
+  const specPath = path.join(process.cwd(), "openapi", "openapi.json");
+  if (!fs.existsSync(specPath)) {
+    throw new Error(`OpenAPI spec missing at ${specPath}; rebuild the service image.`);
+  }
+  const raw = JSON.parse(fs.readFileSync(specPath, "utf8")) as Record<string, unknown>;
+  const info = raw.info as Record<string, unknown> | undefined;
+  if (info) {
+    info.version = serviceVersion;
+  }
+  return raw;
+}
+
+function securityHeadersMiddleware(req: express.Request, res: express.Response, next: express.NextFunction): void {
   res.setHeader("X-Content-Type-Options", "nosniff");
+  if (!isOpenApiDocumentationPath(req.path)) {
+    res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+    res.setHeader("Content-Security-Policy", "default-src 'self'");
+  }
   next();
 }
 
@@ -48,23 +71,32 @@ export function createApp(input: CreateAppInput): express.Express {
   app.use(createMetricsMiddleware(input.httpRequestDuration));
   app.use(express.json({ limit: JSON_BODY_LIMIT_BYTES }));
 
-  const routesGlob =
-    process.env.NODE_ENV === "production"
-      ? path.join(process.cwd(), "dist", "presentation", "routes", "*.js")
-      : path.join(process.cwd(), "src", "presentation", "routes", "*.ts");
+  const openapiSpec = loadOpenApiDocument(input.serviceVersion);
 
-  const openapiSpec = swaggerJsdoc({
-    definition: {
-      openapi: "3.0.0",
-      info: {
-        title: "Transaction Service API",
-        version: input.serviceVersion,
-      },
-    },
-    apis: [routesGlob],
+  app.get("/openapi.json", (_req, res) => {
+    res.setHeader("Content-Type", "application/json; charset=utf-8");
+    res.status(200).send(JSON.stringify(openapiSpec));
   });
 
-  app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(openapiSpec));
+  app.use(
+    "/api/docs",
+    swaggerUi.serve,
+    swaggerUi.setup(undefined, {
+      swaggerOptions: {
+        url: "/openapi.json",
+        persistAuthorization: true,
+        displayRequestDuration: true,
+        docExpansion: "list",
+        filter: true,
+        tryItOutEnabled: true,
+        defaultModelsExpandDepth: 3,
+        defaultModelExpandDepth: 6,
+        displayOperationId: false,
+        showExtensions: true,
+        showCommonExtensions: true,
+      },
+    }),
+  );
 
   app.get("/health", (_req, res) => {
     res.status(200).json({

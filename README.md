@@ -147,7 +147,7 @@ banking-system/
 
 Each service includes seed scripts that load from `bank_Dataset/`:
 
-- `bank_customers.csv` - 60 customers
+- `bank_customers.csv` - 60 customers (loaded automatically when the Customer Service container starts, after migrations)
 - `bank_accounts.csv` - 88 accounts
 - `bank_transactions.csv` - 300 transactions
 

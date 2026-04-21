@@ -1,0 +1,48 @@
+o clear the cache manually and ensure you are starting from a completely clean state, follow these steps:
+1. Clear Docker Build Cache 
+Use the docker builder prune command to remove the data Docker stores from previous build attempts. 
+Docker Docs
+Docker Docs
+ +1
+Remove Dangling Cache: docker builder prune.
+Remove ALL Build Cache: This is the most thorough way to ensure no old, corrupted layers remain.
+bash
+docker builder prune -a
+Use code with caution.
+The "Nuke" Option: If you want to clear everything (stopped containers, unused networks, and all build cache), use docker system prune.
+bash
+docker system prune -a --volumes
+Use code with caution.
+ 
+2. Clear Local System Cache (Windows/Mac)
+If your corporate proxy has "remembered" the failure from earlier, clearing your local network state can help. 
+YouTube
+YouTube
+Flush DNS: This forces your computer to re-resolve the addresses for Ubuntu mirrors.
+Windows: ipconfig /flushdns
+Mac: sudo killall -HUP mDNSResponder
+Reset Proxy Settings (Windows): If you suspect a bad proxy configuration is stuck in the system:
+cmd
+netsh winhttp reset proxy
+Use code with caution.
+(Then restart your computer.) 
+Webex Help Center
+Webex Help Center
+3. Clear Cache Inside the Dockerfile 
+If the build is failing specifically at the apt-get update step, it may be because apt itself has cached some metadata. You can force it to clear this by adding a command to your Dockerfile before the update: 
+Ask Ubuntu
+Ask Ubuntu
+ +2
+dockerfile
+# Clean out existing lists to force a fresh download
+RUN rm -rf /var/lib/apt/lists/* && apt-get update
+Use code with caution.
+Why "Yesterday it ran in a minute"
+As mentioned earlier, there was a major Ubuntu outage today. Even if they are back up now, many corporate proxies have a Time To Live (TTL) on errors. If the proxy saw a "400 Bad Request" an hour ago, it might keep serving that same error to you without even trying to reach the Ubuntu servers again until its own cache expires. 
+Mendix Forum
+Mendix Forum
+Did running the docker builder prune -a command reclaim a significant amount of space, or did it say 0B? 
+
+
+
+

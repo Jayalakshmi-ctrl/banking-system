@@ -20,8 +20,13 @@ COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules/.prisma ./node_modules/.prisma
 COPY --from=build /app/node_modules/@prisma ./node_modules/@prisma
 COPY prisma ./prisma
+COPY openapi ./openapi
+COPY docker-entrypoint.sh /docker-entrypoint.sh
+USER root
+RUN chmod +x /docker-entrypoint.sh && chown nodejs:nodejs /docker-entrypoint.sh
 USER nodejs
 EXPOSE 8003
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=5 \
   CMD wget -qO- http://127.0.0.1:8003/health || exit 1
+ENTRYPOINT ["/docker-entrypoint.sh"]
 CMD ["node", "dist/server.js"]

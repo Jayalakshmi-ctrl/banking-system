@@ -10,13 +10,7 @@ function asyncHandler(
   };
 }
 
-/**
- * @openapi
- * /api/v1/accounts/{accountId}/statements:
- *   get:
- *     summary: Account statement
- *     tags: [Statements]
- */
+/** Statement route; OpenAPI lives in `openapi/openapi.json`. */
 
 export function createStatementRouter(service: TransactionService): Router {
   const router = Router({ mergeParams: true });

@@ -84,8 +84,8 @@ services:
   # ---------- Microservices ----------
   customer-service:
     build:
-      context: ./banking-customer-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: banking-customer-service/Dockerfile
     ports:
       - "8001:8001"
     environment:
@@ -99,8 +99,8 @@ services:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8001/health')\""]
       interval: 15s
       timeout: 5s
-      start_period: 20s
-      retries: 3
+      start_period: 90s
+      retries: 5
 
   account-service:
     build:
@@ -157,8 +157,8 @@ services:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8003/health || exit 1"]
       interval: 15s
       timeout: 5s
-      start_period: 15s
-      retries: 3
+      start_period: 60s
+      retries: 5
 
   notification-service:
     build:
