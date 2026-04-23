@@ -26,6 +26,13 @@ from src.presentation.schemas import HealthResponse
 logger = structlog.get_logger(__name__)
 
 
+def _is_openapi_documentation_path(path: str) -> bool:
+    """Swagger/ReDoc load scripts and styles from CDNs; a strict default-src 'self' CSP yields a blank UI."""
+    if path in ("/openapi.json", "/redoc"):
+        return True
+    return path == "/docs" or path.startswith("/docs/")
+
+
 def configure_structlog(log_level: str) -> None:
     level = getattr(logging, log_level.upper(), logging.INFO)
     logging.basicConfig(level=level, format="%(message)s", stream=sys.stdout)
@@ -68,6 +75,12 @@ def create_app() -> FastAPI:
         version=settings.app_version,
         docs_url="/docs",
         redoc_url="/redoc",
+        description=(
+            "Customer and KYC APIs for the banking platform. "
+            "Request/response JSON uses **snake_case** (e.g. `customer_id`, `kyc_status`). "
+            "`phone` must be 10–15 digits; `email` must be valid. "
+            "Use **GET /api/v1/customers** to obtain real `customer_id` values when integrated with Account Service."
+        ),
     )
 
     @app.middleware("http")
@@ -83,6 +96,8 @@ def create_app() -> FastAPI:
     async def security_headers_middleware(request: Request, call_next):
         response = await call_next(request)
         response.headers["X-Content-Type-Options"] = "nosniff"
+        if _is_openapi_documentation_path(request.url.path):
+            return response
         response.headers["Content-Security-Policy"] = "default-src 'self'"
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         return response

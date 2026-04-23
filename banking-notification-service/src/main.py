@@ -19,6 +19,7 @@ from src.application.consumers import ConsumerHandlers
 from src.application.services import NotificationService
 from src.config import Settings
 from src.infrastructure import database, messaging
+from src.infrastructure.http_request_metrics import install_http_request_counter
 from src.infrastructure.repositories import NotificationRepository
 from src.presentation.routes import RouteDependencies, register_routes
 
@@ -42,6 +43,7 @@ def create_app(
         notification_service=service,
     )
     register_routes(app, deps)
+    install_http_request_counter(app)
     _register_swagger(app)
     _register_request_hooks(app)
     _register_error_handlers(app)

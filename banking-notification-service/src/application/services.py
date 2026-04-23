@@ -197,9 +197,14 @@ def _default_email_body(notification: Notification) -> str:
     return str(notification.payload)
 
 
+def _status_transition_labels(payload: dict[str, Any]) -> tuple[str, str]:
+    old_s = payload.get("old_status") or payload.get("previousStatus") or ""
+    new_s = payload.get("new_status") or payload.get("newStatus") or ""
+    return str(old_s), str(new_s)
+
+
 def _default_sms_body(notification: Notification) -> str:
     if notification.event_type == EventType.ACCOUNT_STATUS_CHANGE:
-        old_s = notification.payload.get("old_status", "")
-        new_s = notification.payload.get("new_status", "")
+        old_s, new_s = _status_transition_labels(dict(notification.payload or {}))
         return f"Account status changed from {old_s} to {new_s}"
     return str(notification.payload)

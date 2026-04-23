@@ -13,9 +13,14 @@ from src.config import Settings
 
 logger = structlog.get_logger(__name__)
 
-TXN_EXCHANGE = "txn.created"
+# Must match transaction-service (topic `banking.events`, rk `txn.created`).
+TXN_EVENTS_EXCHANGE = "banking.events"
+TXN_ROUTING_KEY = "txn.created"
 TXN_QUEUE = "txn.created.notifications"
-ACCOUNT_EXCHANGE = "account.status.changed"
+
+# Must match account-service (topic `banking.domain`, rk `account.status.changed`).
+BANKING_DOMAIN_EXCHANGE = "banking.domain"
+ACCOUNT_STATUS_ROUTING_KEY = "account.status.changed"
 ACCOUNT_QUEUE = "account.status.notifications"
 RABBITMQ_SOCKET_TIMEOUT_SECONDS = 5
 RABBITMQ_HEARTBEAT_SECONDS = 30
@@ -71,16 +76,20 @@ def _run_session(url: str, handlers: ConsumerHandlers) -> None:
 
 
 def _declare_topology(channel: BlockingChannel) -> None:
-    channel.exchange_declare(exchange=TXN_EXCHANGE, exchange_type="fanout", durable=True)
+    channel.exchange_declare(exchange=TXN_EVENTS_EXCHANGE, exchange_type="topic", durable=True)
     channel.queue_declare(queue=TXN_QUEUE, durable=True)
-    channel.queue_bind(exchange=TXN_EXCHANGE, queue=TXN_QUEUE)
-    channel.exchange_declare(
-        exchange=ACCOUNT_EXCHANGE,
-        exchange_type="fanout",
-        durable=True,
+    channel.queue_bind(
+        exchange=TXN_EVENTS_EXCHANGE,
+        queue=TXN_QUEUE,
+        routing_key=TXN_ROUTING_KEY,
     )
+    channel.exchange_declare(exchange=BANKING_DOMAIN_EXCHANGE, exchange_type="topic", durable=True)
     channel.queue_declare(queue=ACCOUNT_QUEUE, durable=True)
-    channel.queue_bind(exchange=ACCOUNT_EXCHANGE, queue=ACCOUNT_QUEUE)
+    channel.queue_bind(
+        exchange=BANKING_DOMAIN_EXCHANGE,
+        queue=ACCOUNT_QUEUE,
+        routing_key=ACCOUNT_STATUS_ROUTING_KEY,
+    )
 
 
 def _make_ack_callback(

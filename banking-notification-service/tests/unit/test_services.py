@@ -6,7 +6,7 @@ import mongomock
 import pytest
 
 from src.application.dtos import SendNotificationRequest
-from src.application.services import NotificationService
+from src.application.services import NotificationService, _status_transition_labels
 from src.config import Settings
 from src.domain.enums import EventType, NotificationChannel, NotificationStatus
 from src.infrastructure.repositories import NotificationRepository
@@ -154,6 +154,12 @@ def test_account_status_missing_contact_marks_failed(
     assert repository._coll.count_documents({}) == 1
     stored = repository._coll.find_one({})
     assert stored["status"] == NotificationStatus.FAILED.value
+
+
+def test_status_transition_labels_accepts_java_account_payload_keys() -> None:
+    old_s, new_s = _status_transition_labels({"previousStatus": "ACTIVE", "newStatus": "FROZEN"})
+    assert old_s == "ACTIVE"
+    assert new_s == "FROZEN"
 
 
 def test_account_status_prefers_email_channel(

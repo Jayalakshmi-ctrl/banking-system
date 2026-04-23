@@ -69,7 +69,7 @@ Coverage report: `target/site/jacoco/index.html`.
 | GET | `/health` | Actuator health (management base path `/`) |
 | GET | `/metrics` | Prometheus registry |
 
-List responses use `{"data":[],"total":0,"limit":20,"offset":0}`.
+List responses use `{"accounts":[],"total":0,"limit":20,"offset":0}`.
 
 ## Architecture
 

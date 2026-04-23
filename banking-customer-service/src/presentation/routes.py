@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, Path, Query, status
 
 from src.application.constants import (
     DEFAULT_CUSTOMER_PAGE_LIMIT,
@@ -74,8 +74,19 @@ async def create_customer(
 @router.get("", response_model=CustomerListEnvelope)
 async def list_customers(
     service: Annotated[CustomerService, Depends(get_customer_service)],
-    limit: int = Query(default=DEFAULT_CUSTOMER_PAGE_LIMIT, ge=1, le=MAX_CUSTOMER_PAGE_LIMIT),
-    offset: int = Query(default=MIN_CUSTOMER_PAGE_OFFSET, ge=MIN_CUSTOMER_PAGE_OFFSET),
+    limit: int = Query(
+        default=DEFAULT_CUSTOMER_PAGE_LIMIT,
+        ge=1,
+        le=MAX_CUSTOMER_PAGE_LIMIT,
+        description="Page size (1–100)",
+        examples=[20],
+    ),
+    offset: int = Query(
+        default=MIN_CUSTOMER_PAGE_OFFSET,
+        ge=MIN_CUSTOMER_PAGE_OFFSET,
+        description="Zero-based row offset",
+        examples=[0],
+    ),
 ) -> CustomerListEnvelope:
     page = await service.list_customers(CustomerListQuery(limit=limit, offset=offset))
     return CustomerListEnvelope(
@@ -88,7 +99,7 @@ async def list_customers(
 
 @router.get("/{customer_id}/kyc", response_model=KycStatusResponse)
 async def get_kyc(
-    customer_id: uuid.UUID,
+    customer_id: Annotated[uuid.UUID, Path(description="Customer UUID")],
     service: Annotated[CustomerService, Depends(get_customer_service)],
 ) -> KycStatusResponse:
     status_value = await service.get_kyc_status(customer_id)

@@ -13,7 +13,18 @@ from src.domain.enums import KycStatus
 
 
 class CustomerCreateRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "name": "Jane Customer",
+                "email": "jane.customer@example.com",
+                "phone": "9123456789",
+                "kyc_status": "PENDING",
+            }
+        },
+    )
 
     name: str = Field(min_length=MIN_CUSTOMER_NAME_LENGTH, max_length=MAX_CUSTOMER_NAME_LENGTH)
     email: EmailStr = Field(max_length=MAX_CUSTOMER_EMAIL_LENGTH)
@@ -22,7 +33,17 @@ class CustomerCreateRequest(BaseModel):
 
 
 class CustomerUpdateRequest(BaseModel):
-    model_config = ConfigDict(str_strip_whitespace=True, extra="forbid")
+    model_config = ConfigDict(
+        str_strip_whitespace=True,
+        extra="forbid",
+        json_schema_extra={
+            "example": {
+                "name": "Jane Customer Updated",
+                "email": "jane.updated@example.com",
+                "phone": "9234567890",
+            }
+        },
+    )
 
     name: str = Field(min_length=MIN_CUSTOMER_NAME_LENGTH, max_length=MAX_CUSTOMER_NAME_LENGTH)
     email: EmailStr = Field(max_length=MAX_CUSTOMER_EMAIL_LENGTH)
@@ -51,7 +72,10 @@ class CustomerListEnvelope(BaseModel):
 
 
 class KycStatusPatchRequest(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_schema_extra={"example": {"kyc_status": "VERIFIED"}},
+    )
 
     kyc_status: KycStatus
 

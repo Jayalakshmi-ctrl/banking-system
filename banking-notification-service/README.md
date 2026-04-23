@@ -1,12 +1,12 @@
 # Banking Notification Service
 
-This service records outbound banking notifications in MongoDB, exposes a small HTTP API for reads and internal dispatch, consumes fanout events from RabbitMQ for high-value transactions and account status changes, and exposes Prometheus metrics and structured JSON logs with PII masking.
+This service records outbound banking notifications in MongoDB, exposes a small HTTP API for reads and internal dispatch, consumes **topic** events from RabbitMQ (**`banking.events`** with routing key **`txn.created`**, and **`banking.domain`** with routing key **`account.status.changed`**) for high-value transactions and account status changes, and exposes Prometheus metrics and structured JSON logs with PII masking.
 
 ## Context and stack
 
 - Python 3.12, Flask, PyMongo, pika, structlog, prometheus-client, flasgger
 - MongoDB 7 (database `notification_db`, collection `notifications_log`)
-- RabbitMQ (fanout exchanges `txn.created` and `account.status.changed`)
+- RabbitMQ (topic exchanges `banking.events` and `banking.domain`, bound as documented below)
 
 ## Prerequisites
 
@@ -105,10 +105,10 @@ Incoming requests may send `X-Correlation-ID`; the same value is echoed on respo
 
 A background thread declares topology, binds queues, and consumes:
 
-| Queue | Exchange | Type | Behaviour |
-| --- | --- | --- | --- |
-| `txn.created.notifications` | `txn.created` | fanout | Parses JSON; if `amount` exceeds `HIGH_VALUE_THRESHOLD` (INR), creates a `TRANSACTION_ALERT` email notification. Optional `customer_email` and `customer_phone` fields should be present for successful delivery. |
-| `account.status.notifications` | `account.status.changed` | fanout | Creates an `ACCOUNT_STATUS_CHANGE` notification; prefers email when `customer_email` is set, otherwise SMS when `customer_phone` is set. |
+| Queue | Exchange | Type | Routing key | Behaviour |
+| --- | --- | --- | --- | --- |
+| `txn.created.notifications` | `banking.events` | topic | `txn.created` | Parses JSON; if `amount` exceeds `HIGH_VALUE_THRESHOLD` (INR), creates a `TRANSACTION_ALERT` email notification. Optional `customer_email` and `customer_phone` fields should be present for successful delivery. |
+| `account.status.notifications` | `banking.domain` | topic | `account.status.changed` | Creates an `ACCOUNT_STATUS_CHANGE` notification; prefers email when `customer_email` is set, otherwise SMS when `customer_phone` is set. |
 
 Malformed JSON is acknowledged without requeue to avoid poison-message loops; handler exceptions negative-ack without requeue.
 

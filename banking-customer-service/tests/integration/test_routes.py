@@ -132,3 +132,69 @@ async def test_metrics_endpoint_exposed(api_client: AsyncClient) -> None:
 
     assert response.status_code == 200
     assert len(response.text) > 0
+
+
+@pytest.mark.asyncio
+async def test_get_kyc_after_create(api_client: AsyncClient) -> None:
+    created = await api_client.post(
+        "/api/v1/customers",
+        json={
+            "name": "Kyc Get User",
+            "email": "kyc.get.user@example.com",
+            "phone": "9456789012",
+        },
+    )
+    customer_id = created.json()["customer_id"]
+
+    response = await api_client.get(f"/api/v1/customers/{customer_id}/kyc")
+
+    assert response.status_code == 200
+    assert response.json()["kyc_status"] == "PENDING"
+
+
+@pytest.mark.asyncio
+async def test_update_customer_put_round_trip(api_client: AsyncClient) -> None:
+    created = await api_client.post(
+        "/api/v1/customers",
+        json={
+            "name": "Put User",
+            "email": "put.user@example.com",
+            "phone": "9567890123",
+        },
+    )
+    customer_id = created.json()["customer_id"]
+
+    response = await api_client.put(
+        f"/api/v1/customers/{customer_id}",
+        json={
+            "name": "Put User Updated",
+            "email": "put.user.updated@example.com",
+            "phone": "9678901234",
+        },
+    )
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["name"] == "Put User Updated"
+    assert body["email"] == "put.user.updated@example.com"
+    assert body["phone"] == "9678901234"
+
+
+@pytest.mark.asyncio
+async def test_soft_delete_customer_returns_204_and_get_404(api_client: AsyncClient) -> None:
+    created = await api_client.post(
+        "/api/v1/customers",
+        json={
+            "name": "Delete User",
+            "email": "delete.user@example.com",
+            "phone": "9789012345",
+        },
+    )
+    customer_id = created.json()["customer_id"]
+
+    deleted = await api_client.delete(f"/api/v1/customers/{customer_id}")
+
+    assert deleted.status_code == 204
+
+    fetched = await api_client.get(f"/api/v1/customers/{customer_id}")
+    assert fetched.status_code == 404

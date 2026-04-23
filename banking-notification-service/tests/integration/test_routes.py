@@ -141,9 +141,11 @@ def test_correlation_id_roundtrip(client: Any) -> None:
 
 
 def test_metrics_endpoint_returns_prometheus_text(client: Any) -> None:
+    client.get("/health")
     response = client.get("/metrics")
     assert response.status_code == 200
     assert b"notifications_sent_total" in response.data
+    assert b"http_requests_total" in response.data
 
 
 def test_health_unhealthy_when_dependencies_down() -> None:

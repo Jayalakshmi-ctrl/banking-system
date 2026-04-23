@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import csv
+import os
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -64,14 +65,22 @@ async def run_seed(csv_path: Path) -> int:
     return inserted
 
 
+def _default_csv_path() -> Path:
+    env = os.getenv("CUSTOMER_SEED_CSV")
+    if env:
+        return Path(env)
+    bundled = Path(__file__).resolve().parent / "data" / "bank_customers.csv"
+    if bundled.is_file():
+        return bundled
+    return Path(__file__).resolve().parents[2] / "bank_Dataset" / "bank_customers.csv"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed customers from CSV into PostgreSQL")
     parser.add_argument(
         "csv_path",
         nargs="?",
-        default=str(
-            Path(__file__).resolve().parents[2] / "bank_Dataset" / "bank_customers.csv",
-        ),
+        default=str(_default_csv_path()),
         help="Path to bank_customers.csv",
     )
     args = parser.parse_args()

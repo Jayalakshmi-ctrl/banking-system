@@ -39,10 +39,11 @@ NOTIFICATION_GET_SWAGGER = {
     "tags": ["Notifications"],
     "parameters": [
         {
-            "name": "id",
+            "name": "notification_id",
             "in": "path",
             "type": "string",
             "required": True,
+            "description": "UUID of the notification (must match route /api/v1/notifications/{notification_id})",
         }
     ],
     "responses": {
@@ -68,14 +69,45 @@ INTERNAL_SEND_SWAGGER = {
                     "payload",
                 ],
                 "properties": {
-                    "recipient_email": {"type": "string"},
-                    "recipient_phone": {"type": "string"},
-                    "channel": {"type": "string", "enum": ["EMAIL", "SMS"]},
+                    "recipient_email": {
+                        "type": "string",
+                        "format": "email",
+                        "example": "customer@example.com",
+                    },
+                    "recipient_phone": {
+                        "type": "string",
+                        "example": "9123456789",
+                        "description": "Digits-only phone for SMS when channel is SMS",
+                    },
+                    "channel": {
+                        "type": "string",
+                        "enum": ["EMAIL", "SMS"],
+                        "example": "EMAIL",
+                    },
                     "event_type": {
                         "type": "string",
                         "enum": ["TRANSACTION_ALERT", "ACCOUNT_STATUS_CHANGE"],
+                        "example": "TRANSACTION_ALERT",
                     },
-                    "payload": {"type": "object"},
+                    "payload": {
+                        "type": "object",
+                        "example": {
+                            "amount": "50000.00",
+                            "currency": "INR",
+                            "reference": "TXN-REF-001",
+                        },
+                    },
+                },
+                "example": {
+                    "recipient_email": "customer@example.com",
+                    "recipient_phone": "9123456789",
+                    "channel": "EMAIL",
+                    "event_type": "TRANSACTION_ALERT",
+                    "payload": {
+                        "amount": "50000.00",
+                        "currency": "INR",
+                        "reference": "TXN-REF-001",
+                    },
                 },
             },
         }
