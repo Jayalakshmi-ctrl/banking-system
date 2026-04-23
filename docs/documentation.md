@@ -64,8 +64,8 @@ flowchart TB
     AS -->|"REST: Validate KYC"| CS
     TS -->|"REST: Validate/Debit/Credit"| AS
 
-    TS -->|"Publish: txn.created"| RMQ
-    AS -->|"Publish: account.status.changed"| RMQ
+    TS -->|"Topic banking.events rk txn.created"| RMQ
+    AS -->|"Topic banking.domain rk account.status.changed"| RMQ
     RMQ -->|"Consume"| NS
 
     CS --> CDB
@@ -87,9 +87,9 @@ flowchart TB
 - Transaction Service calls Account Service to validate balances, debit source accounts, and credit destination accounts
 
 **Asynchronous (RabbitMQ):**
-- Transaction Service publishes `txn.created` events after successful transactions
-- Account Service publishes `account.status.changed` events on status updates
-- Notification Service consumes both event types and generates alerts
+- Transaction Service publishes to topic exchange **`banking.events`** with routing key **`txn.created`** after successful transactions (payload includes optional `customer_email` / `customer_phone` from Customer Service enrichment)
+- Account Service publishes to topic exchange **`banking.domain`** with routing key **`account.status.changed`** on status updates (payload includes customer contact when Customer Service is reachable)
+- Notification Service binds durable queues to those exchanges and generates alerts
 
 ### 3.3 Transfer Workflow (Sequence Diagram)
 
@@ -111,7 +111,7 @@ sequenceDiagram
     AS-->>TS: 200 OK (credited)
     TS->>TS: Store TRANSFER_OUT + TRANSFER_IN
     TS->>TS: Store idempotency key
-    TS->>RMQ: Publish txn.created event
+    TS->>RMQ: Publish banking.events / txn.created
     TS-->>C: 201 Created
     RMQ->>NS: Deliver event
     NS->>NS: Check high-value threshold
