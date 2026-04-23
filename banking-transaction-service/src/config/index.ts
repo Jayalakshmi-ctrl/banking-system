@@ -3,6 +3,7 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   ACCOUNT_SERVICE_URL: z.string().url(),
+  CUSTOMER_SERVICE_URL: z.string().url(),
   RABBITMQ_URL: z.string().min(1),
   PORT: z.coerce.number().int().min(1).max(65535).default(8003),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace"]).default("info"),

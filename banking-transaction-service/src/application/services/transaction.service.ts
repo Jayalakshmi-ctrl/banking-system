@@ -10,6 +10,7 @@ import type {
 import type { DepositStrategy } from "./deposit.strategy";
 import type { TransferStrategy } from "./transfer.strategy";
 import type { WithdrawalStrategy } from "./withdrawal.strategy";
+import { recordFailedTransfer } from "../../infrastructure/metrics/business-metrics";
 import type { TransactionRepository } from "../../infrastructure/repositories/transaction.repository";
 
 function mapRecord(record: {
@@ -48,12 +49,17 @@ export class TransactionService {
     return this.withdrawalStrategy.execute(dto);
   }
 
-  processTransfer(params: { dto: TransferRequestDto; idempotency_key: string; now: Date }): Promise<TransferResponseDto> {
-    return this.transferStrategy.execute({
-      dto: params.dto,
-      idempotency_key: params.idempotency_key,
-      now: params.now,
-    });
+  async processTransfer(params: { dto: TransferRequestDto; idempotency_key: string; now: Date }): Promise<TransferResponseDto> {
+    try {
+      return await this.transferStrategy.execute({
+        dto: params.dto,
+        idempotency_key: params.idempotency_key,
+        now: params.now,
+      });
+    } catch (error) {
+      recordFailedTransfer();
+      throw error;
+    }
   }
 
   async listTransactions(params: { limit: number; offset: number }): Promise<PaginatedTransactionsDto> {

@@ -12,6 +12,9 @@ export interface TxnCreatedPayload {
   txn_type: string;
   reference: string;
   created_at: string;
+  customer_id?: string;
+  customer_email?: string;
+  customer_phone?: string;
 }
 
 export interface TxnEventPublisher {

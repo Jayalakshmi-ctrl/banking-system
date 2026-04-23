@@ -3,6 +3,7 @@ import pino from "pino";
 import promClient from "prom-client";
 import { createApp } from "../../src/app";
 import type { TransactionService } from "../../src/application/services/transaction.service";
+import { initBusinessMetrics } from "../../src/infrastructure/metrics/business-metrics";
 
 function buildMetrics(): { register: promClient.Registry; httpRequestDuration: promClient.Histogram<string> } {
   const register = new promClient.Registry();
@@ -13,6 +14,7 @@ function buildMetrics(): { register: promClient.Registry; httpRequestDuration: p
     buckets: [0.05, 0.1],
     registers: [register],
   });
+  initBusinessMetrics(register);
   return { register, httpRequestDuration };
 }
 
@@ -151,6 +153,9 @@ describe("HTTP API", () => {
     const res = await request(app).get("/metrics");
     expect(res.status).toBe(200);
     expect(res.text.length).toBeGreaterThan(0);
+    expect(res.text).toContain("transactions_total");
+    expect(res.text).toContain("failed_transfers_total");
+    expect(res.text).toContain("daily_limit_exceeded_total");
   });
 
   it("serves OpenAPI document at /openapi.json", async () => {

@@ -60,6 +60,7 @@ Use `.env.example` as the single reference for variables. Do not commit real cre
 |----------|---------|
 | `DATABASE_URL` | PostgreSQL connection string for `transaction_db` |
 | `ACCOUNT_SERVICE_URL` | Base URL of the Account Service |
+| `CUSTOMER_SERVICE_URL` | Base URL of the Customer Service (contact enrichment for `txn.created` events) |
 | `RABBITMQ_URL` | AMQP connection string |
 | `PORT` | HTTP listen port |
 | `LOG_LEVEL` | Pino log level |

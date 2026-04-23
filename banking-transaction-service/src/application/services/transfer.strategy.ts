@@ -12,6 +12,8 @@ import { AppError } from "../errors";
 import { utcDayRange } from "./day-boundaries";
 import { generateTransactionReference } from "./reference.generator";
 import { exceedsDailyTransferLimit } from "./transfer-limit";
+import { recordDailyLimitExceeded, recordSuccessfulTransaction } from "../../infrastructure/metrics/business-metrics";
+import type { TxnContactResolver } from "./txn-contact-resolver";
 
 const PROBLEM_BASE = "https://api.bank.local/problems";
 
@@ -22,6 +24,7 @@ export interface TransferStrategyDeps {
   publisher: TxnEventPublisher;
   logger: Logger;
   config: AppConfig;
+  contactResolver: TxnContactResolver;
 }
 
 function toResponse(record: {
@@ -131,6 +134,7 @@ export class TransferStrategy {
         limitInr: this.deps.config.DAILY_TRANSFER_LIMIT,
       })
     ) {
+      recordDailyLimitExceeded();
       throw new AppError(
         "Daily transfer limit exceeded",
         422,
@@ -241,26 +245,26 @@ export class TransferStrategy {
     }
 
     await this.publishPair(response);
+    recordSuccessfulTransaction("transfer");
 
     return response;
   }
 
   private async publishPair(response: TransferResponseDto): Promise<void> {
+    await this.publishTxnLeg(response.transfer_out);
+    await this.publishTxnLeg(response.transfer_in);
+  }
+
+  private async publishTxnLeg(leg: TransactionResponseDto): Promise<void> {
+    const contact = await this.deps.contactResolver.forAccount(leg.account_id);
     await this.deps.publisher.publishTxnCreated({
-      txn_id: response.transfer_out.txn_id,
-      account_id: response.transfer_out.account_id,
-      amount: response.transfer_out.amount,
-      txn_type: response.transfer_out.txn_type,
-      reference: response.transfer_out.reference,
-      created_at: response.transfer_out.created_at,
-    });
-    await this.deps.publisher.publishTxnCreated({
-      txn_id: response.transfer_in.txn_id,
-      account_id: response.transfer_in.account_id,
-      amount: response.transfer_in.amount,
-      txn_type: response.transfer_in.txn_type,
-      reference: response.transfer_in.reference,
-      created_at: response.transfer_in.created_at,
+      txn_id: leg.txn_id,
+      account_id: leg.account_id,
+      amount: leg.amount,
+      txn_type: leg.txn_type,
+      reference: leg.reference,
+      created_at: leg.created_at,
+      ...contact,
     });
   }
 }

@@ -7,6 +7,7 @@ metadata:
     app: transaction-service
 data:
   ACCOUNT_SERVICE_URL: "http://account-service:8002"
+  CUSTOMER_SERVICE_URL: "http://customer-service:8001"
   PORT: "8003"
   LOG_LEVEL: "info"
   DAILY_TRANSFER_LIMIT: "200000"

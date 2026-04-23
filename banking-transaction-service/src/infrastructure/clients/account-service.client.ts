@@ -93,4 +93,20 @@ export class AccountServiceClient {
       await this.http.post(`/internal/accounts/${accountId}/credit`, body);
     });
   }
+
+  /**
+   * Public GET for notification enrichment (customerId). Returns null on any failure.
+   */
+  async getPublicAccountSummary(accountId: string): Promise<{ customerId: string } | null> {
+    try {
+      const res = await this.http.get<Record<string, unknown>>(`/api/v1/accounts/${accountId}`);
+      const customerId = res.data.customerId;
+      if (typeof customerId !== "string" || customerId.length === 0) {
+        return null;
+      }
+      return { customerId };
+    } catch {
+      return null;
+    }
+  }
 }

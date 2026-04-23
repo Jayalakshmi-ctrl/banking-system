@@ -7,6 +7,8 @@ import type { TransactionRepository } from "../../infrastructure/repositories/tr
 import type { DepositRequestDto, TransactionResponseDto } from "../dtos/transaction.dto";
 import { AppError } from "../errors";
 import { generateTransactionReference } from "./reference.generator";
+import { recordSuccessfulTransaction } from "../../infrastructure/metrics/business-metrics";
+import type { TxnContactResolver } from "./txn-contact-resolver";
 
 const PROBLEM_BASE = "https://api.bank.local/problems";
 
@@ -16,6 +18,7 @@ export interface DepositStrategyDeps {
   publisher: TxnEventPublisher;
   logger: Logger;
   high_value_threshold_inr: number;
+  contactResolver: TxnContactResolver;
 }
 
 function toResponse(record: {
@@ -97,6 +100,7 @@ export class DepositStrategy {
       if (new Decimal(dto.amount).greaterThan(new Decimal(this.deps.high_value_threshold_inr))) {
         this.deps.logger.info({ correlation: "high_value_txn", txn_id: body.txn_id }, "High value deposit recorded");
       }
+      const contact = await this.deps.contactResolver.forAccount(body.account_id);
       await this.deps.publisher.publishTxnCreated({
         txn_id: body.txn_id,
         account_id: body.account_id,
@@ -104,7 +108,9 @@ export class DepositStrategy {
         txn_type: body.txn_type,
         reference: body.reference,
         created_at: body.created_at,
+        ...contact,
       });
+      recordSuccessfulTransaction("deposit");
       return body;
     } catch (error) {
       this.deps.logger.error({ err: error, account_id: dto.account_id, reference }, "Deposit persist failed; compensating");

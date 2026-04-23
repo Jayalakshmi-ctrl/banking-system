@@ -9,9 +9,12 @@ import { DepositStrategy } from "./application/services/deposit.strategy";
 import { TransferStrategy } from "./application/services/transfer.strategy";
 import { WithdrawalStrategy } from "./application/services/withdrawal.strategy";
 import { AccountServiceClient } from "./infrastructure/clients/account-service.client";
+import { CustomerServiceClient } from "./infrastructure/clients/customer-service.client";
+import { DefaultTxnContactResolver } from "./application/services/txn-contact-resolver";
 import { prisma } from "./infrastructure/database/prisma";
 import { NullTxnEventPublisher, RabbitMqPublisher } from "./infrastructure/messaging/rabbitmq";
 import type { TxnEventPublisher } from "./infrastructure/messaging/rabbitmq";
+import { initBusinessMetrics } from "./infrastructure/metrics/business-metrics";
 import { IdempotencyRepository } from "./infrastructure/repositories/idempotency.repository";
 import { TransactionRepository } from "./infrastructure/repositories/transaction.repository";
 
@@ -28,6 +31,7 @@ async function bootstrap(): Promise<void> {
     buckets: [0.05, 0.1, 0.25, 0.5, 1, 2, 5],
     registers: [register],
   });
+  initBusinessMetrics(register);
 
   let publisher: TxnEventPublisher = new NullTxnEventPublisher();
   try {
@@ -39,6 +43,8 @@ async function bootstrap(): Promise<void> {
   }
 
   const accountClient = AccountServiceClient.fromConfig(config);
+  const customerClient = new CustomerServiceClient(config.CUSTOMER_SERVICE_URL);
+  const contactResolver = new DefaultTxnContactResolver(accountClient, customerClient);
   const transactionRepo = new TransactionRepository(prisma);
   const idempotencyRepo = new IdempotencyRepository(prisma);
 
@@ -48,6 +54,7 @@ async function bootstrap(): Promise<void> {
     publisher,
     logger,
     high_value_threshold_inr: config.HIGH_VALUE_THRESHOLD,
+    contactResolver,
   });
   const withdrawalStrategy = new WithdrawalStrategy({
     accounts: accountClient,
@@ -55,6 +62,7 @@ async function bootstrap(): Promise<void> {
     publisher,
     logger,
     high_value_threshold_inr: config.HIGH_VALUE_THRESHOLD,
+    contactResolver,
   });
   const transferStrategy = new TransferStrategy({
     accounts: accountClient,
@@ -63,6 +71,7 @@ async function bootstrap(): Promise<void> {
     publisher,
     logger,
     config,
+    contactResolver,
   });
 
   const transactionService = new TransactionService(
