@@ -23,6 +23,7 @@ COPY seed ./seed
 COPY bank_Dataset/bank_customers.csv ./seed/data/bank_customers.csv
 COPY alembic.ini .
 COPY docker-entrypoint.sh /docker-entrypoint.sh
+
 RUN chmod +x /docker-entrypoint.sh
 
 USER app
