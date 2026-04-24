@@ -84,8 +84,8 @@ services:
   # ---------- Microservices ----------
   customer-service:
     build:
-      context: ./banking-customer-service   # ✅ FIXED
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: banking-customer-service/Dockerfile
     ports:
       - "8001:8001"
     environment:
@@ -176,6 +176,8 @@ services:
       MAX_RETRY_COUNT: "3"
       PORT: "8004"
       LOG_LEVEL: INFO
+      ENABLE_RABBIT_CONSUMER: "true"
+      ENABLE_HSTS: "false"
     depends_on:
       notification-db:
         condition: service_healthy
@@ -228,3 +230,4 @@ volumes:
   rabbitmq-data:
   prometheus-data:
   grafana-data:
+ 
