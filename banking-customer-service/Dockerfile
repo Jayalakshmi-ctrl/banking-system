@@ -1,7 +1,7 @@
 FROM python:3.12-slim AS builder
 
 WORKDIR /build
-COPY requirements.txt .
+COPY banking-customer-service/requirements.txt .
 RUN pip install --no-cache-dir --upgrade pip
 RUN pip wheel --no-cache-dir -r requirements.txt -w /wheels
 
@@ -17,13 +17,12 @@ RUN groupadd --system app && useradd --system -g app app
 COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 
-COPY src ./src
-COPY migrations ./migrations
-COPY seed ./seed
+COPY banking-customer-service/src ./src
+COPY banking-customer-service/migrations ./migrations
+COPY banking-customer-service/seed ./seed
 COPY bank_Dataset/bank_customers.csv ./seed/data/bank_customers.csv
-COPY alembic.ini .
-COPY docker-entrypoint.sh /docker-entrypoint.sh
-
+COPY banking-customer-service/alembic.ini .
+COPY banking-customer-service/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /docker-entrypoint.sh
 
 USER app
