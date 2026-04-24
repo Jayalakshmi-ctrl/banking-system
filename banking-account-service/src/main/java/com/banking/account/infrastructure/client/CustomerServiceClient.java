@@ -1,9 +1,9 @@
 package com.banking.account.infrastructure.client;
 
 import com.banking.account.application.KycConstraints;
-import com.banking.account.infrastructure.config.CustomerServiceProperties;
 import com.banking.account.presentation.exception.BusinessRuleViolationException;
 import com.banking.account.presentation.exception.UpstreamServiceException;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -41,6 +41,29 @@ public class CustomerServiceClient {
         } catch (RestClientException e) {
             log.error("Customer service unavailable customerId={}", customerId, e);
             throw new UpstreamServiceException("Customer service unavailable", e);
+        }
+    }
+
+    /**
+     * Best-effort read for notification payloads; does not throw on 404/5xx so account flows stay resilient.
+     */
+    public Optional<CustomerProfileJson> tryFetchCustomerProfile(UUID customerId) {
+        try {
+            CustomerProfileJson body = customerRestClient
+                    .get()
+                    .uri("/api/v1/customers/{id}", customerId)
+                    .retrieve()
+                    .body(CustomerProfileJson.class);
+            if (body == null || body.email() == null || body.email().isBlank()) {
+                return Optional.empty();
+            }
+            return Optional.of(body);
+        } catch (HttpClientErrorException.NotFound e) {
+            log.warn("Customer not found for notification enrichment customerId={}", customerId);
+            return Optional.empty();
+        } catch (RestClientException e) {
+            log.warn("Customer service unavailable for notification enrichment customerId={}", customerId, e);
+            return Optional.empty();
         }
     }
 }

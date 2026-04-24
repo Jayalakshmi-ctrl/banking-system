@@ -69,8 +69,8 @@ public class AccountService {
         int safeOffset = Math.max(offset, 0);
         long total = accountRepository.countByDeletedAtIsNull();
         List<Account> rows = accountRepository.findAllActiveWithOffset(safeOffset, safeLimit);
-        List<AccountResponse> data = rows.stream().map(this::toResponse).toList();
-        return new PagedAccountsResponse(data, total, safeLimit, safeOffset);
+        List<AccountResponse> accounts = rows.stream().map(this::toResponse).toList();
+        return new PagedAccountsResponse(accounts, total, safeLimit, safeOffset);
     }
 
     @Transactional(readOnly = true)
@@ -110,9 +110,10 @@ public class AccountService {
         int safeLimit = clampLimit(limit);
         int safeOffset = Math.max(offset, 0);
         long total = accountRepository.countByCustomerIdAndDeletedAtIsNull(customerId);
-        List<Account> rows = accountRepository.findByCustomerWithOffset(customerId, safeOffset, safeLimit);
-        List<AccountResponse> data = rows.stream().map(this::toResponse).toList();
-        return new PagedAccountsResponse(data, total, safeLimit, safeOffset);
+        List<Account> rows =
+                accountRepository.findActiveByCustomerIdOrderedWithPagination(customerId, safeOffset, safeLimit);
+        List<AccountResponse> accounts = rows.stream().map(this::toResponse).toList();
+        return new PagedAccountsResponse(accounts, total, safeLimit, safeOffset);
     }
 
     @Transactional(readOnly = true)

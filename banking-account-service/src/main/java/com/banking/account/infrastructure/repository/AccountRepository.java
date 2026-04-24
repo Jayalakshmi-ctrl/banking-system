@@ -10,7 +10,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface AccountRepository extends JpaRepository<Account, UUID> {
+public interface AccountRepository extends JpaRepository<Account, UUID>, AccountRepositoryCustom {
 
     Optional<Account> findByAccountIdAndDeletedAtIsNull(UUID accountId);
 
@@ -27,17 +27,6 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
             nativeQuery = true
     )
     List<Account> findAllActiveWithOffset(@Param("offset") int offset, @Param("limit") int limit);
-
-    @Query(
-            value = "SELECT * FROM accounts WHERE deleted_at IS NULL AND customer_id = :customerId "
-                    + "ORDER BY created_at DESC OFFSET :offset LIMIT :limit",
-            nativeQuery = true
-    )
-    List<Account> findByCustomerWithOffset(
-            @Param("customerId") UUID customerId,
-            @Param("offset") int offset,
-            @Param("limit") int limit
-    );
 
     @Query(value = "SELECT COUNT(*) FROM accounts WHERE deleted_at IS NULL AND customer_id = :customerId", nativeQuery = true)
     long countByCustomerIdAndDeletedAtIsNull(@Param("customerId") UUID customerId);
